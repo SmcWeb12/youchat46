@@ -6,7 +6,6 @@ import ChatsPage from "./ChatsPage"; // Importing ChatsPage
 import GroupsPage from "./GroupsPage"; // Importing GroupsPage
 import StoriesPage from "./StoriesPage"; // Importing StoriesPage
 import StatusPage from "./StatusPage"; // Importing StatusPage
-import Navbar from "../components/UI/Navbar";
 import { FaCommentDots, FaUsers, FaImage, FaCheckCircle } from "react-icons/fa"; // Importing icons
 
 const HomePage = ({ userId }) => {
@@ -57,8 +56,8 @@ const HomePage = ({ userId }) => {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-gradient-to-br from-green-400 to-blue-500">
+      {/* ✅ Navbar removed */}
       {/* Main Content */}
-      <Navbar/>
       <div className="flex-grow w-full overflow-y-auto">
         {selectedTab === "chats" && <ChatsPage users={users} />}
         {selectedTab === "groups" && <GroupsPage groups={groups} />}
