@@ -1,136 +1,118 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaHome, FaUsers, FaBars } from 'react-icons/fa';
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  FaUserCircle,
+  FaSignOutAlt,
+  FaHome,
+  FaUsers,
+  FaCog,
+  FaMoon,
+  FaSun,
+} from "react-icons/fa";
 
-const Navbar = ({ onLogout }) => {
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const Navbar = ({ onLogout, darkMode, setDarkMode }) => {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const location = useLocation();
 
-  // Close menus if clicked outside of the Navbar
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.navbar')) {
-        setIsProfileMenuOpen(false);
-        setIsMobileMenuOpen(false);
+      if (!event.target.closest(".navbar") && !event.target.closest(".settings-menu")) {
+        setIsSettingsOpen(false);
       }
     };
-    document.addEventListener('click', handleClickOutside);
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  const toggleProfileMenu = () => setIsProfileMenuOpen((prev) => !prev);
-  const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
-
-  const closeMenus = () => {
-    setIsProfileMenuOpen(false);
-    setIsMobileMenuOpen(false);
+  const toggleSettings = (e) => {
+    e.stopPropagation();
+    setIsSettingsOpen((prev) => !prev);
   };
 
-  // Determine the active link
+  const closeMenus = () => setIsSettingsOpen(false);
+
   const getLinkClass = (path) =>
-    location.pathname === path ? 'text-yellow-400' : 'text-white';
+    location.pathname === path
+      ? "text-yellow-400 font-semibold"
+      : "text-white hover:text-yellow-300";
 
   return (
-    <nav className="bg-blue-600 p-4 flex justify-between items-center shadow-lg fixed top-0 left-0 w-full z-50 navbar">
+    <nav
+      className={`navbar fixed top-0 left-0 w-full p-4 z-50 shadow-lg flex items-center justify-between transition-colors duration-300 ${
+        darkMode ? "bg-gray-900" : "bg-gradient-to-r from-blue-700 to-blue-500"
+      }`}
+    >
       {/* Logo */}
-      <div>
-        <Link
-          to="/home"
-          className="text-white text-xl font-bold flex items-center"
-          onClick={closeMenus}
-        >
-          <FaHome className="mr-2" />
-        </Link>
-      </div>
-
-      {/* Hamburger Icon (Mobile Only) */}
-      <div className="md:hidden">
-        <button
-          onClick={toggleMobileMenu}
-          className="text-white text-2xl"
-          aria-label="Toggle navigation menu"
-        >
-          <FaBars />
-        </button>
-      </div>
-
-      {/* Navbar Links (Desktop and Mobile) */}
-      <div
-        className={`${
-          isMobileMenuOpen ? 'block' : 'hidden'
-        } absolute top-16 left-0 w-full bg-blue-600 md:static md:w-auto md:flex md:items-center md:gap-6`}
+      <Link
+        to="/home"
+        className="text-white text-2xl font-bold flex items-center gap-2"
+        onClick={closeMenus}
       >
-        <Link
-          to="/home"
-          className={`block md:inline-block px-4 py-2 ${getLinkClass(
-            '/home'
-          )} hover:text-yellow-400 transition-all duration-200 ease-in-out`}
-          onClick={closeMenus}
-        >
-          <FaHome className="inline mr-2" /> Home
-        </Link>
-        <Link
-          to="/profile/edit"
-          className={`block md:inline-block px-4 py-2 ${getLinkClass(
-            '/profile/edit'
-          )} hover:text-yellow-400 transition-all duration-200 ease-in-out`}
-          onClick={closeMenus}
-        >
-          <FaUserCircle className="inline mr-2" /> Profile
-        </Link>
-        <Link
-          to="/groupchat"
-          className={`block md:inline-block px-4 py-2 ${getLinkClass(
-            '/groupchat'
-          )} hover:text-yellow-400 transition-all duration-200 ease-in-out`}
-          onClick={closeMenus}
-        >
-          <FaUsers className="inline mr-2" /> Group Chat
-        </Link>
-        <button
-          onClick={() => {
-            onLogout();
-            closeMenus();
-          }}
-          className="block md:inline-block px-4 py-2 text-white hover:text-yellow-400 transition-all duration-200 ease-in-out"
-        >
-          <FaSignOutAlt className="inline mr-2" /> Logout
-        </button>
-      </div>
+        <FaHome /> YouChat
+      </Link>
 
-      {/* Profile Dropdown (Mobile Only) */}
-      <div className="md:hidden relative">
+      {/* Settings Button */}
+      <div className="relative">
         <button
-          onClick={toggleProfileMenu}
-          className="text-white text-2xl"
-          aria-label="Toggle profile menu"
+          onClick={toggleSettings}
+          className="text-white text-2xl hover:text-yellow-300 transition"
         >
-          <FaUserCircle />
+          <FaCog />
         </button>
-        {isProfileMenuOpen && (
+
+        {/* Settings Dropdown */}
+        {isSettingsOpen && (
           <div
-            className="absolute top-16 right-0 bg-white text-black p-4 rounded-lg shadow-lg"
-            onBlur={() => setIsProfileMenuOpen(false)}
-            tabIndex={0}
+            className={`settings-menu absolute right-0 top-12 rounded-lg shadow-xl w-56 py-2 animate-slideDown transition-all ${
+              darkMode ? "bg-gray-800 text-gray-100" : "bg-blue-600 text-white"
+            }`}
           >
             <Link
-              to="/profile/edit"
-              className="block mb-2 text-gray-700 hover:text-blue-600"
+              to="/home"
+              className={`block px-4 py-2 ${getLinkClass("/home")}`}
               onClick={closeMenus}
             >
-              Edit Profile
+              <FaHome className="inline mr-2" /> Home
             </Link>
+            <Link
+              to="/profile/edit"
+              className={`block px-4 py-2 ${getLinkClass("/profile/edit")}`}
+              onClick={closeMenus}
+            >
+              <FaUserCircle className="inline mr-2" /> Profile
+            </Link>
+            <Link
+              to="/groupchat"
+              className={`block px-4 py-2 ${getLinkClass("/groupchat")}`}
+              onClick={closeMenus}
+            >
+              <FaUsers className="inline mr-2" /> CreateGroup
+            </Link>
+
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={() => setDarkMode((prev) => !prev)}
+              className="w-full text-left px-4 py-2 flex items-center hover:text-yellow-300"
+            >
+              {darkMode ? (
+                <>
+                  <FaSun className="inline mr-2 text-yellow-300" /> Light Mode
+                </>
+              ) : (
+                <>
+                  <FaMoon className="inline mr-2" /> Dark Mode
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => {
                 onLogout();
                 closeMenus();
               }}
-              className="block text-red-500"
+              className="w-full text-left px-4 py-2 hover:text-yellow-300"
             >
-              Logout
+              <FaSignOutAlt className="inline mr-2" /> Logout
             </button>
           </div>
         )}
