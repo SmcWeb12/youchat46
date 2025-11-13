@@ -1,51 +1,96 @@
 // GroupsPage.js
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Search, Users } from "lucide-react";
 
 const GroupsPage = ({ groups }) => {
+  const [search, setSearch] = useState("");
+  const location = useLocation();
+
+  const getLinkClass = (path) =>
+    location.pathname === path
+      ? "bg-blue-600 text-white"
+      : "text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-800 transition-all duration-200";
+
+  const filteredGroups = groups.filter((group) =>
+    group.name.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {groups.map((group) => (
-        <Link
-          to={`/groupchat/${group.id}`} // Redirect to GroupChatPage.js when clicked
-          key={group.id}
-        >
-          <div className="group-card bg-white p-4 rounded-xl border-2 border-gray-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-            {/* Group Info Section */}
-            <div className="flex items-center space-x-3">
-              {/* Group Image */}
-              <div className="group-image w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-2 border-gray-300">
-                <img
-                  src={group.image || 'https://via.placeholder.com/100'}
-                  alt={group.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+    <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white flex justify-center items-start py-6">
+      <div className="w-full sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%] bg-gray-100 dark:bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-gray-300 dark:border-gray-700">
+        {/* Header */}
+        <div className="px-4 py-3 flex justify-between items-center bg-gray-200 dark:bg-gray-800">
+          <h1 className="text-lg font-semibold text-black dark:text-white">Groups</h1>
 
-              {/* Group Name and Info */}
-              <div className="group-info flex-grow">
-                <h3 className="text-sm sm:text-base font-semibold text-gray-800 truncate">{group.name}</h3>
-                <p className="text-xs sm:text-sm text-gray-500">{group.members.length} members</p>
-              </div>
-            </div>
+          {/* Create Group Button */}
+          <Link
+            to="/groupchat"
+            className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium ${getLinkClass(
+              "/groupchat"
+            )}`}
+          >
+            <Users className="mr-2 w-4 h-4" />
+            Create Group
+          </Link>
+        </div>
 
-            {/* Last Message and Group Activity */}
-            <div className="group-activity mt-2 text-gray-600 flex justify-between items-center">
-              <p className="text-xs sm:text-sm line-clamp-1">{group.lastMessage || "No messages yet"}</p>
-              {group.isActive && (
-                <span className="text-xs text-green-500 bg-green-100 px-2 py-1 rounded-full">
-                  Active
-                </span>
-              )}
-            </div>
+        {/* Search bar */}
+        <div className="p-3 border-b border-gray-300 dark:border-gray-700 flex items-center bg-gray-100 dark:bg-gray-900">
+          <Search className="text-gray-500 dark:text-gray-400 mr-3 w-4 h-4" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search or start a new group"
+            className="w-full bg-transparent outline-none text-black dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm"
+          />
+        </div>
 
-            {/* Group Type / Admin */}
-            <div className="group-type mt-1 text-xs sm:text-sm text-gray-500">
-              <p>{group.isAdmin ? "Admin" : "Member"}</p>
+        {/* Groups list */}
+        <div className="overflow-y-auto h-[75vh] scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-900">
+          {filteredGroups.length === 0 ? (
+            <div className="text-center text-gray-500 dark:text-gray-400 py-10">
+              No groups found
             </div>
-          </div>
-        </Link>
-      ))}
+          ) : (
+            filteredGroups.map((group) => (
+              <Link
+                to={`/groupchat/${group.id}`}
+                key={group.id}
+                className="flex items-center px-4 py-3 hover:bg-gray-200 dark:hover:bg-gray-800 transition-all duration-200 border-b border-gray-300 dark:border-gray-700"
+              >
+                {/* Group Image */}
+                <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4">
+                  <img
+                    src={group.image || "https://via.placeholder.com/100"}
+                    alt={group.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {group.isActive && (
+                    <span className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-black rounded-full"></span>
+                  )}
+                </div>
+
+                {/* Group Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center">
+                    <h3 className="truncate text-[15px] font-medium text-black dark:text-white">
+                      {group.name}
+                    </h3>
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {group.time || "now"}
+                    </span>
+                  </div>
+                  <p className="truncate text-[13px] text-gray-600 dark:text-gray-400 mt-0.5">
+                    {group.lastMessage || "No messages yet"}
+                  </p>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };
