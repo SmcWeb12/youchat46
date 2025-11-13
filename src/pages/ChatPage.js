@@ -3,26 +3,34 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db, storage } from '../firebase/firebase';
 import { doc, getDoc, setDoc, addDoc, collection, query, orderBy, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { uploadBytesResumable, getDownloadURL, ref } from 'firebase/storage';
-import { IoArrowBack, IoSend, IoAttach, IoHappy, IoTrash } from 'react-icons/io5'; 
-import Navbar from '../components/UI/Navbar';
+import { IoArrowBack, IoSend, IoAttach, IoHappy, IoTrash, IoLockClosed } from 'react-icons/io5';
 import ProfileView from './ProfileView';
-import EmojiPicker from 'emoji-picker-react'; 
+import EmojiPicker from 'emoji-picker-react';
 
 const ChatPage = ({ user }) => {
   const { userId } = useParams();
   const [chatUser, setChatUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedImage, setSelectedImage] = useState(null);  // For full-screen image preview
+  const [selectedImage, setSelectedImage] = useState(null);
   const [isProfileViewVisible, setIsProfileViewVisible] = useState(false);
-  const [file, setFile] = useState(null);  // For the file input
-  const [fileType, setFileType] = useState(null); // For image/pdf file type
+  const [file, setFile] = useState(null);
+  const [fileType, setFileType] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(null); // State for upload progress
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [isLocked, setIsLocked] = useState(false);
   const navigate = useNavigate();
   const textareaRef = useRef(null);
+  const chatEndRef = useRef(null);
 
-  // Fetch chat user and set up the real-time listener for messages
+  useEffect(() => {
+    if (!user) {
+      setIsLocked(true);
+    } else {
+      setIsLocked(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     const fetchChatUser = async () => {
       try {
@@ -30,7 +38,6 @@ const ChatPage = ({ user }) => {
         if (userDoc.exists()) {
           setChatUser(userDoc.data());
         } else {
-          console.error('User not found');
           navigate('/home');
         }
       } catch (error) {
@@ -40,7 +47,7 @@ const ChatPage = ({ user }) => {
 
     fetchChatUser();
 
-    const chatId = user.uid < userId ? user.uid + userId : userId + user.uid;
+    const chatId = user?.uid < userId ? user?.uid + userId : userId + user?.uid;
     const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('timestamp'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const messagesArr = querySnapshot.docs.map((doc) => ({
@@ -51,11 +58,14 @@ const ChatPage = ({ user }) => {
     });
 
     return () => unsubscribe();
-  }, [userId, user.uid, navigate]);
+  }, [userId, user?.uid, navigate]);
 
-  // Send message function (handles text and file sending)
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const sendMessage = async () => {
-    if (newMessage.trim() === '' && !file) return; // Prevent sending empty messages
+    if (newMessage.trim() === '' && !file) return;
 
     const chatId = user.uid < userId ? user.uid + userId : userId + user.uid;
 
@@ -71,7 +81,6 @@ const ChatPage = ({ user }) => {
 
       let fileUrl = null;
       if (file) {
-        // Upload file and handle progress
         const fileRef = ref(storage, `chats/${chatId}/${Date.now()}_${file.name}`);
         const uploadTask = uploadBytesResumable(fileRef, file);
 
@@ -79,28 +88,27 @@ const ChatPage = ({ user }) => {
           'state_changed',
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setUploadProgress(progress); // Set progress
+            setUploadProgress(progress);
           },
           (error) => {
             console.error('Error uploading file:', error);
-            setUploadProgress(null); // Reset progress on error
+            setUploadProgress(null);
           },
           async () => {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             fileUrl = downloadURL;
-            setUploadProgress(null); // Reset progress after upload
-            sendMessageWithFile(fileUrl); // Send message with the file URL
+            setUploadProgress(null);
+            sendMessageWithFile(fileUrl);
           }
         );
       } else {
-        sendMessageWithFile(fileUrl); // Send message without file if none selected
+        sendMessageWithFile(fileUrl);
       }
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
 
-  // Helper function to send a message with or without file
   const sendMessageWithFile = async (fileUrl) => {
     const chatId = user.uid < userId ? user.uid + userId : userId + user.uid;
 
@@ -112,12 +120,10 @@ const ChatPage = ({ user }) => {
         timestamp: new Date(),
         status: 'sent',
         fileUrl: fileUrl,
-        fileType: fileType, // Include file type (image/pdf)
+        fileType: fileType,
       };
 
       await addDoc(collection(db, 'chats', chatId, 'messages'), messageData);
-
-      // Reset message and file states after sending
       setNewMessage('');
       setFile(null);
       setFileType(null);
@@ -126,62 +132,68 @@ const ChatPage = ({ user }) => {
     }
   };
 
-  // Format message text (handle new lines)
+  // 🧠 Convert URLs in message text into clickable links
   const formatMessageText = (text) => {
-    return text.split('\n').map((line, index) => (
-      <span key={index}>
-        {line}
-        <br />
-      </span>
-    ));
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, index) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-yellow-200 underline break-words hover:text-yellow-400"
+          >
+            {part}
+          </a>
+        );
+      }
+      return (
+        <span key={index} className="break-words">
+          {part}
+        </span>
+      );
+    });
   };
 
-  // Handle image click to preview it
   const handleImageClick = (imageUrl) => {
-    setSelectedImage(imageUrl); // Set selected image for full-screen view
+    setSelectedImage(imageUrl);
   };
 
-  // Close the full-screen image modal
   const closeImageModal = () => {
-    setSelectedImage(null); // Close the modal
+    setSelectedImage(null);
   };
 
-  // Handle text input changes
   const handleTextAreaChange = (e) => {
     setNewMessage(e.target.value);
-    autoResizeTextArea(e.target);
+    e.target.style.height = 'auto';
+    e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
-  // Auto resize the text area based on the input text
-  const autoResizeTextArea = (element) => {
-    element.style.height = 'auto';
-    element.style.height = `${element.scrollHeight}px`;
-  };
-
-  // Handle emoji picker selection
   const handleEmojiClick = (emoji) => {
-    setNewMessage((prevMessage) => prevMessage + emoji.emoji);
-    setShowEmojiPicker(false); // Close emoji picker after selection
+    setNewMessage((prev) => prev + emoji.emoji);
+    setShowEmojiPicker(false);
   };
 
-  // Handle file input changes
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       setFile(selectedFile);
-
-      const type = selectedFile.type.startsWith('image') ? 'image' : selectedFile.type === 'application/pdf' ? 'pdf' : '';
+      const type = selectedFile.type.startsWith('image')
+        ? 'image'
+        : selectedFile.type === 'application/pdf'
+        ? 'pdf'
+        : '';
       setFileType(type);
     }
   };
 
-  // Delete a specific message
   const deleteMessage = async (messageId) => {
     const chatId = user.uid < userId ? user.uid + userId : userId + user.uid;
-
     try {
       await deleteDoc(doc(db, 'chats', chatId, 'messages', messageId));
-      console.log('Message deleted');
     } catch (error) {
       console.error('Error deleting message:', error);
     }
@@ -189,72 +201,80 @@ const ChatPage = ({ user }) => {
 
   if (!chatUser) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-xl text-gray-500">Loading...</div>
+      <div className="flex justify-center items-center h-screen bg-blue-100">
+        <div className="text-xl text-gray-600 animate-pulse">Loading Chat...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-blue-100 flex flex-col relative">
-      <div className="absolute inset-0 bg-black opacity-30 z-10"></div>
+    <div className="h-screen flex flex-col bg-gradient-to-br from-blue-100 to-indigo-200 relative">
+      {isLocked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-60 backdrop-blur-md z-50">
+          <IoLockClosed size={60} className="text-white mb-4" />
+          <h2 className="text-white text-2xl font-semibold">Chat Locked</h2>
+          <p className="text-gray-300 mt-2">Please login to unlock your messages 🔐</p>
+        </div>
+      )}
 
-      <Navbar user={user} onLogout={() => {}} />
-
-      <div className="relative z-20 bg-blue-600 p-4 flex items-center border-b">
-        <button onClick={() => navigate(-1)} className="mr-4 text-white hover:text-gray-300">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex items-center shadow-lg">
+        <button onClick={() => navigate(-1)} className="mr-4 text-white hover:opacity-80 transition">
           <IoArrowBack size={24} />
         </button>
-
         <img
           src={chatUser.profileImage || 'https://via.placeholder.com/50'}
           alt={chatUser.name}
-          className="w-12 h-12 rounded-full object-cover"
+          className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover"
         />
         <div className="ml-4 flex flex-col">
           <span
-            className="font-semibold text-white cursor-pointer"
+            className="font-semibold text-white text-lg cursor-pointer hover:underline"
             onClick={() => setIsProfileViewVisible(true)}
           >
             {chatUser.name}
           </span>
+          <span className="text-sm text-blue-200">Online</span>
         </div>
       </div>
 
-      {isProfileViewVisible && (
-        <ProfileView userId={userId} setIsProfileViewVisible={setIsProfileViewVisible} />
-      )}
+      {isProfileViewVisible && <ProfileView userId={userId} setIsProfileViewVisible={setIsProfileViewVisible} />}
 
-      <div className="flex-1 p-4 overflow-y-auto bg-white bg-opacity-60 z-20">
-        <div className="space-y-4">
+      <div className="flex-1 p-4 overflow-y-auto bg-gradient-to-b from-white/70 to-indigo-100 backdrop-blur-sm">
+        <div className="space-y-3">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${message.senderId === user.uid ? 'justify-end' : 'justify-start'} relative`}
+              className={`flex ${message.senderId === user.uid ? 'justify-end' : 'justify-start'}`}
             >
-              <div className="relative max-w-xs rounded-lg px-4 py-2 bg-blue-200 text-black">
+              <div
+                className={`relative max-w-[75%] rounded-2xl px-4 py-2 shadow-md ${
+                  message.senderId === user.uid
+                    ? 'bg-blue-500 text-white rounded-br-none'
+                    : 'bg-gray-200 text-black rounded-bl-none'
+                }`}
+              >
                 {message.fileUrl && message.fileType === 'image' && (
                   <div onClick={() => handleImageClick(message.fileUrl)}>
                     <img
                       src={message.fileUrl}
                       alt="uploaded"
-                      className="w-40 h-40 object-cover rounded-lg cursor-pointer"
+                      className="w-48 h-48 object-cover rounded-xl cursor-pointer mb-2"
                     />
                   </div>
                 )}
 
                 {message.fileUrl && message.fileType === 'pdf' && (
                   <a href={message.fileUrl} target="_blank" rel="noopener noreferrer">
-                    <button className="bg-blue-500 text-white py-2 px-4 rounded-md">Open PDF</button>
+                    <button className="bg-blue-700 text-white py-1 px-3 rounded-md text-sm">Open PDF</button>
                   </a>
                 )}
 
-                <span>{formatMessageText(message.text)}</span>
+                <div className="text-sm">{formatMessageText(message.text)}</div>
 
                 {message.senderId === user.uid && (
                   <button
                     onClick={() => deleteMessage(message.id)}
-                    className="absolute top-0 right-0 p-1 text-xs text-red-500"
+                    className="absolute top-1 right-1 text-xs text-red-300 hover:text-red-600 transition"
                   >
                     <IoTrash />
                   </button>
@@ -262,65 +282,61 @@ const ChatPage = ({ user }) => {
               </div>
             </div>
           ))}
+          <div ref={chatEndRef}></div>
         </div>
       </div>
 
-      <div className="p-4 bg-white flex items-center shadow-md z-20">
-        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-xl">
+      <div className="p-4 bg-white flex items-center shadow-inner border-t border-gray-200">
+        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="text-xl text-gray-600 hover:text-blue-500">
           <IoHappy />
         </button>
 
-        {showEmojiPicker && <EmojiPicker onEmojiClick={handleEmojiClick} />}
+        {showEmojiPicker && (
+          <div className="absolute bottom-20 left-4 z-40">
+            <EmojiPicker onEmojiClick={handleEmojiClick} />
+          </div>
+        )}
 
         <textarea
           ref={textareaRef}
           value={newMessage}
           onChange={handleTextAreaChange}
           rows={1}
-          className="flex-1 p-2 ml-2 border border-gray-300 rounded-md resize-none"
-          placeholder="Type a message"
+          className="flex-1 p-2 ml-2 border border-gray-300 rounded-xl resize-none outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+          placeholder="Type a message..."
         />
 
-        {/* Progress bar when file is uploading */}
         {uploadProgress !== null && (
-          <div className="w-full mt-2">
-            <div className="bg-gray-200 w-full h-2 rounded-lg">
+          <div className="w-24 mx-2">
+            <div className="bg-gray-200 h-2 rounded-full">
               <div
-                className="bg-blue-500 h-2 rounded-lg"
+                className="bg-blue-500 h-2 rounded-full transition-all"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500">{Math.round(uploadProgress)}% Uploading...</span>
           </div>
         )}
 
-        <input
-          type="file"
-          id="file-input"
-          onChange={handleFileChange}
-          className="hidden"
-          accept="image/*,application/pdf"
-        />
-
-        <label htmlFor="file-input" className="cursor-pointer">
+        <input type="file" id="file-input" onChange={handleFileChange} className="hidden" accept="image/*,application/pdf" />
+        <label htmlFor="file-input" className="cursor-pointer text-gray-600 hover:text-blue-500 mx-2">
           <IoAttach size={24} />
         </label>
 
-        <button onClick={sendMessage} className="ml-2 p-2 text-white bg-blue-500 rounded-full">
+        <button
+          onClick={sendMessage}
+          className="ml-2 p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition"
+        >
           <IoSend size={24} />
         </button>
       </div>
 
       {selectedImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-30 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black bg-opacity-80 z-30 flex items-center justify-center">
           <div className="relative">
-            <button
-              className="absolute top-2 right-2 text-white text-xl"
-              onClick={closeImageModal}
-            >
+            <button className="absolute top-2 right-2 text-white text-2xl" onClick={closeImageModal}>
               ×
             </button>
-            <img src={selectedImage} alt="Preview" className="max-w-full max-h-full object-contain" />
+            <img src={selectedImage} alt="Preview" className="max-w-full max-h-screen rounded-lg shadow-2xl" />
           </div>
         </div>
       )}
